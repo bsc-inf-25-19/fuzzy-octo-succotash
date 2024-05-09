@@ -14,8 +14,9 @@ const pool = new Pool({
 });
 
 // Endpoint for address search
-app.get('/search', async (req, res) => {
-    const searchText = req.query.text;
+app.use(express.json());
+app.post('/search', async (req, res) => {
+    const searchText = req.body.text;
 
     try {
         const client = await pool.connect();
@@ -24,11 +25,13 @@ app.get('/search', async (req, res) => {
       WHERE house_no || ' ' || road_name || ' ' || postcode || ' ' || area_name ILIKE $1
     `, [`%${searchText}%`]);
 
-        client.release();
         res.json(result.rows);
     } catch (err) {
         console.error('Error executing query', err);
         res.status(500).json({ error: 'Internal server error' });
+    }
+    finally {
+        client.release();
     }
 });
 
