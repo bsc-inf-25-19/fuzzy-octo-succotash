@@ -21,8 +21,16 @@ app.get('/search', async (req, res) => {
     try {
         const client = await pool.connect();
         const result = await client.query(`
-      SELECT id, road_name, area_name, house_no, latitude, longitude FROM address_locations
-      WHERE house_no || ' ' || road_name || ' ' || postcode || ' ' || area_name ILIKE $1
+        SELECT id, road_name, area_name, house_no, postcode, latitude, longitude 
+        FROM address_locations 
+        WHERE 
+            house_no || ' ' || road_name || ' ' || postcode || ' ' || area_name ILIKE '%' || $1 || '%' OR
+            road_name || ' ' || area_name || ' ' || postcode || ' ' || house_no ILIKE '%' || $1 || '%' OR
+            area_name || ' ' || road_name || ' ' || postcode || ' ' || house_no ILIKE '%' || $1 || '%' OR
+            road_name || ' ' || postcode || ' ' || area_name || ' ' || house_no ILIKE '%' || $1 || '%' OR
+            area_name || ' ' || postcode || ' ' || road_name || ' ' || house_no ILIKE '%' || $1 || '%' OR
+            postcode || ' ' || area_name || ' ' || road_name || ' ' || house_no ILIKE '%' || $1 || '%'
+          
     `, [`%${searchText}%`]);
 
     client.release();
