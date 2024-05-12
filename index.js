@@ -13,6 +13,29 @@ const pool = new Pool({
     port: 5432,
 });
 
+// Endpoint for address find
+app.get('/find', async (req, res) => {
+    try {
+        const [house_no, road_name, area_name] = req.query.input.split(', ');
+
+        const client = await pool.connect();
+        const result = await client.query(`
+            SELECT id, road_name, area_name, house_no, postcode, latitude, longitude 
+            FROM address_locations 
+            WHERE 
+                house_no = $1 AND
+                road_name = $2 AND
+                area_name = $3
+        `, [house_no, road_name, area_name]);
+
+        client.release();
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error executing find query', err);
+        res.status(500).json({ error: 'Internal server error on find' });
+    }
+})
+
 // Endpoint for address search
 // app.use(express.json());
 app.get('/search', async (req, res) => {
@@ -36,8 +59,8 @@ app.get('/search', async (req, res) => {
     client.release();
     res.json(result.rows);
 } catch (err) {
-    console.error('Error executing query', err);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error executing search query', err);
+    res.status(500).json({ error: 'Internal server error on search' });
 }
 })
 
