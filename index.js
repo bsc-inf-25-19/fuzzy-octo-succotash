@@ -44,27 +44,35 @@ app.get('/search', async (req, res) => {
     const searchText = req.query.text;
 
     try {
+        // Split the search text into separate terms
+        const searchTerms = searchText.split(' ');
+
+        // Construct the tsquery string
+        const tsqueryString = searchTerms.join(' & ');
+
         const client = await pool.connect();
         const result = await client.query(`
-        SELECT id, road_name, area_name, house_no, postcode, latitude, longitude 
-        FROM address_locations 
-        WHERE 
-            house_no || ' ' || road_name || ' ' || postcode || ' ' || area_name ILIKE '%' || $1 || '%' OR
-            road_name || ' ' || area_name || ' ' || postcode || ' ' || house_no ILIKE '%' || $1 || '%' OR
-            area_name || ' ' || road_name || ' ' || postcode || ' ' || house_no ILIKE '%' || $1 || '%' OR
-            road_name || ' ' || postcode || ' ' || area_name || ' ' || house_no ILIKE '%' || $1 || '%' OR
-            area_name || ' ' || postcode || ' ' || road_name || ' ' || house_no ILIKE '%' || $1 || '%' OR
-            postcode || ' ' || area_name || ' ' || road_name || ' ' || house_no ILIKE '%' || $1 || '%'
-          
-    `, [`%${searchText}%`]);
+            SELECT 
+                gid AS id, house_no, road_name, area_name, postcode, district, region,
+                ST_Y(ST_Transform(ST_SetSRID(ST_Centroid(geom), 32736), 4326)) AS latitude, 
+                ST_X(ST_Transform(ST_SetSRID(ST_Centroid(geom), 32736), 4326)) AS longitude 
+            FROM 
+                zcc_merged_plots 
+            WHERE 
+                to_tsvector(house_no || ' ' || road_name || ' ' || area_name|| ' ' || postcode || ' ' || district || ' ' || region  || ' ' || area_name) @@ to_tsquery($1) 
+                AND ST_GeometryType(geom) = 'ST_MultiPolygon' 
+                AND ST_IsValid(geom);     
+        `, [tsqueryString]);
 
-    client.release();
-    res.json(result.rows);
-} catch (err) {
-    console.error('Error executing search query', err);
-    res.status(500).json({ error: 'Internal server error on search' });
-}
+        client.release();
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error executing search query', err);
+        res.status(500).json({ error: 'Internal server error on search' });
+    }
 })
+
+app.use(morgan('combined')); // enable development logging
 
 // Start the server
 app.listen(port, () => {
