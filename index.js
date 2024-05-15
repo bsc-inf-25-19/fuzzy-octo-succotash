@@ -1,6 +1,9 @@
 const express = require('express');
 const morgan = require('morgan');
-const parser = require('fast-xml-parser');
+const {XMLParser} = require('fast-xml-parser');
+const xmlbuilder = require('xmlbuilder');
+const cors = require('cors');
+
 
 const { Pool } = require('pg');
 
@@ -15,6 +18,17 @@ const pool = new Pool({
     password: 'JoelJones',
     port: 5432,
 });
+
+function convertDataToXml(data) {
+    const root = xmlbuilder.create('root');
+    data.forEach(item => {
+        const element = root.ele('element');
+        Object.keys(item).forEach(key => {
+            element.ele(key, item[key]);
+        });
+    });
+    return root.end({ pretty: true });
+}
 
 // Endpoint for address find
 app.get('/find', async (req, res) => {
@@ -84,17 +98,9 @@ app.get('/search', async (req, res) => {
         res.status(500).json({ error: 'Internal server error on search' });
     }
 })
-function convertDataToXml(data) {
-    const options = {
-      attributeNamePrefix: "", // Optional: remove prefixes from attributes
-      textNodeName: "text", // Optional: change the default text node name
-    };
-    const xmlParser = new parser.Parser(options);
-    const jsonObj = { root: { element: data } }; // Wrap data in a root element
-    const xmlData = xmlParser.stringify(jsonObj);
-    return xmlData;
-  }
+
 app.use(morgan('combined')); // enable development logging
+app.use(cors());
 
 // Start the server
 app.listen(port, () => {
