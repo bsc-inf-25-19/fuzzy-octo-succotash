@@ -1,5 +1,6 @@
 const express = require('express');
 const morgan = require('morgan');
+const parser = require('fast-xml-parser');
 
 const { Pool } = require('pg');
 
@@ -42,6 +43,8 @@ app.get('/find', async (req, res) => {
 // app.use(express.json());
 app.get('/search', async (req, res) => {
     const searchText = req.query.text;
+    const acceptedType = req.accepts('json', 'xml'); // Check accepted types
+
 
     try {
         // Split the search text into separate terms
@@ -65,13 +68,32 @@ app.get('/search', async (req, res) => {
         `, [tsqueryString]);
 
         client.release();
-        res.json(result.rows);
+        if (acceptedType === 'json') {
+            res.setHeader('Content-Type', 'application/json');
+            res.json(result.rows);
+        } else if (acceptedType === 'xml') {
+            // Implement XML serialization logic here (using a library)
+            const xmlData = convertDataToXml(result.rows); // Hypothetical function
+            res.setHeader('Content-Type', 'application/xml');
+            res.send(xmlData);
+        } else {
+            res.status(406).send('Not Acceptable: Unsupported content type');
+        }
     } catch (err) {
         console.error('Error executing search query', err);
         res.status(500).json({ error: 'Internal server error on search' });
     }
 })
-
+function convertDataToXml(data) {
+    const options = {
+      attributeNamePrefix: "", // Optional: remove prefixes from attributes
+      textNodeName: "text", // Optional: change the default text node name
+    };
+    const xmlParser = new parser.Parser(options);
+    const jsonObj = { root: { element: data } }; // Wrap data in a root element
+    const xmlData = xmlParser.stringify(jsonObj);
+    return xmlData;
+  }
 app.use(morgan('combined')); // enable development logging
 
 // Start the server
