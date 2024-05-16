@@ -1,6 +1,5 @@
 const express = require('express');
 const morgan = require('morgan');
-const {XMLParser} = require('fast-xml-parser');
 const xmlbuilder = require('xmlbuilder');
 const cors = require('cors');
 
