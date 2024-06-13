@@ -2,20 +2,28 @@ const express = require('express');
 const morgan = require('morgan');
 const xmlbuilder = require('xmlbuilder');
 const cors = require('cors');
-
-
 const { Pool } = require('pg');
+const fs = require('fs');
+const path = require('path');
+require('dotenv').config();
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
+
+// Load the CA certificate
+const caCertificate = fs.readFileSync(path.join(__dirname, 'ca-certificate.crt'));
 
 // Create a PostgreSQL connection pool
 const pool = new Pool({
-    user: 'postgres',
-    host: 'localhost',
-    database: 'gis',
-    password: 'JoelJones',
-    port: 5432,
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_DATABASE,
+    password: process.env.DB_PASSWORD,
+    port: process.env.DB_PORT,
+    ssl: {
+        rejectUnauthorized: true,
+        ca: caCertificate,
+    },
 });
 
 function convertDataToXml(data) {
@@ -53,11 +61,9 @@ app.get('/find', async (req, res) => {
 })
 
 // Endpoint for address search
-// app.use(express.json());
 app.get('/search', async (req, res) => {
     const searchText = req.query.text;
-    const acceptedType = req.accepts('json', 'xml'); // Check accepted types
-
+    const acceptedType = req.accepts(['json', 'xml']); // Check accepted types
 
     try {
         // Split the search text into separate terms
@@ -75,7 +81,7 @@ app.get('/search', async (req, res) => {
             FROM 
                 zcc_merged_plots 
             WHERE 
-                to_tsvector(house_no || ' ' || road_name || ' ' || area_name|| ' ' || postcode || ' ' || district || ' ' || region  || ' ' || area_name) @@ to_tsquery($1) 
+                to_tsvector(house_no || ' ' || road_name || ' ' || area_name || ' ' || postcode || ' ' || district || ' ' || region || ' ' || area_name) @@ to_tsquery($1) 
                 AND ST_GeometryType(geom) = 'ST_MultiPolygon' 
                 AND ST_IsValid(geom);     
         `, [tsqueryString]);
@@ -85,8 +91,7 @@ app.get('/search', async (req, res) => {
             res.setHeader('Content-Type', 'application/json');
             res.json(result.rows);
         } else if (acceptedType === 'xml') {
-            // Implement XML serialization logic here (using a library)
-            const xmlData = convertDataToXml(result.rows); // Hypothetical function
+            const xmlData = convertDataToXml(result.rows);
             res.setHeader('Content-Type', 'application/xml');
             res.send(xmlData);
         } else {
